@@ -62,12 +62,13 @@ export async function generateImage(args: z.infer<typeof generateImageSchema>): 
   const status = await authManager.getSessionStatus();
 
   if (!status.isLoggedIn) {
-    if (args.email && args.password) {
+    // Try credentials from args first, then fall back to environment variables
+    const email = args.email || process.env.ELEVENLABS_EMAIL;
+    const password = args.password || process.env.ELEVENLABS_PASSWORD;
+
+    if (email && password) {
       console.error('[generateImage] Not logged in, attempting authentication...');
-      const loginSuccess = await authManager.login({
-        email: args.email,
-        password: args.password
-      });
+      const loginSuccess = await authManager.login({ email, password });
 
       if (!loginSuccess) {
         return JSON.stringify({
@@ -78,7 +79,7 @@ export async function generateImage(args: z.infer<typeof generateImageSchema>): 
     } else {
       return JSON.stringify({
         success: false,
-        error: 'Not logged in. Please provide email and password to authenticate, or log in first.'
+        error: 'Not logged in. Please provide email and password via tool parameters or ELEVENLABS_EMAIL/ELEVENLABS_PASSWORD environment variables.'
       });
     }
   }
