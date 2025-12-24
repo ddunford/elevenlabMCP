@@ -45,16 +45,36 @@ export class BrowserManager {
       headless,
       viewport: { width: 1920, height: 1080 },
       acceptDownloads: true,
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       args: [
         '--disable-blink-features=AutomationControlled',
         '--no-sandbox',
-        '--disable-setuid-sandbox'
+        '--disable-setuid-sandbox',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
       ],
       ignoreDefaultArgs: ['--enable-automation'],
     });
 
     const pages = this.context.pages();
     this.page = pages[0] || await this.context.newPage();
+
+    // Hide webdriver flag - must be added before any navigation
+    await this.page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    });
+
+    // Set extra headers to ensure Referer is sent (required by Firebase Auth)
+    await this.page.setExtraHTTPHeaders({
+      'Referer': 'https://elevenlabs.io/'
+    });
+
+    // Navigate to main site first to ensure init script is applied
+    await this.page.goto('https://elevenlabs.io', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+
     this.initialized = true;
 
     console.error('[BrowserManager] Browser initialized');

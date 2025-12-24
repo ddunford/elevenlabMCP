@@ -21,7 +21,7 @@ export class AuthManager {
 
       // Navigate to login page
       await page.goto(DEFAULTS.LOGIN_URL, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: DEFAULTS.TIMEOUT_NAVIGATION
       });
 
@@ -127,19 +127,35 @@ export class AuthManager {
     const page = await this.browserManager.getPage();
 
     try {
-      // Navigate to the app to check auth status
-      const currentUrl = page.url();
-      if (!currentUrl.includes('elevenlabs.io')) {
-        await page.goto(DEFAULTS.IMAGE_VIDEO_URL, {
-          waitUntil: 'domcontentloaded',
-          timeout: DEFAULTS.TIMEOUT_NAVIGATION
-        });
+      // Always navigate to the app to check auth status
+      await page.goto(DEFAULTS.IMAGE_VIDEO_URL, {
+        waitUntil: 'domcontentloaded',
+        timeout: DEFAULTS.TIMEOUT_NAVIGATION
+      });
+
+      // Handle cookie consent if present - this can block everything
+      try {
+        const acceptCookies = page.locator('button:has-text("ACCEPT ALL COOKIES")').first();
+        if (await acceptCookies.isVisible({ timeout: 2000 })) {
+          await acceptCookies.click();
+          console.error('[AuthManager] Dismissed cookie consent');
+          await page.waitForTimeout(1000);
+        }
+      } catch {
+        // Cookie banner not present
       }
 
-      // Check if redirected to login page
-      await page.waitForTimeout(2000); // Wait for any redirects
-      const finalUrl = page.url();
-      const isLoggedIn = !finalUrl.includes('sign-in') && finalUrl.includes('elevenlabs.io');
+      // Wait for client-side JavaScript to potentially redirect us
+      // Check URL multiple times to catch any redirects
+      let isLoggedIn = true;
+      for (let i = 0; i < 5; i++) {
+        await page.waitForTimeout(1000);
+        const currentUrl = page.url();
+        if (currentUrl.includes('sign-in')) {
+          isLoggedIn = false;
+          break;
+        }
+      }
 
       const sessionData = await this.sessionStore.load();
 
