@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.auth/
+.env
+*.log
+
+# Generated images
+assets/*.png
+assets/*.webp
