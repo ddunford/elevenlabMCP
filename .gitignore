@@ -7,3 +7,7 @@ dist/
 # Generated images
 assets/*.png
 assets/*.webp
+
+# Test files with credentials
+test-login.ts
+login-test.png
