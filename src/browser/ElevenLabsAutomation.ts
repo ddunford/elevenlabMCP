@@ -138,8 +138,19 @@ export class ElevenLabsAutomation {
         };
       }
 
-      // Wait for the page to be fully loaded
-      await page.waitForTimeout(2000);
+      // Wait for the page to be fully interactive
+      await page.waitForTimeout(3000);
+
+      // Wait for any loading overlays to disappear
+      try {
+        await page.waitForFunction('getComputedStyle(document.documentElement).pointerEvents !== "none"', { timeout: 10000 });
+      } catch {
+        console.error('[ElevenLabsAutomation] Warning: page may have blocking overlay');
+      }
+
+      // Press Escape to dismiss any popups
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
 
       // Select model if different from default
       if (model !== DEFAULT_MODEL) {
@@ -155,8 +166,18 @@ export class ElevenLabsAutomation {
       console.error('[ElevenLabsAutomation] Entering prompt...');
       const promptInput = page.locator(SELECTORS.IMAGE_GEN.PROMPT_INPUT).first();
       await promptInput.waitFor({ state: 'visible', timeout: 10000 });
-      await promptInput.click();
-      await promptInput.fill(prompt);
+
+      // Use JavaScript to focus and fill - bypasses any overlay issues
+      await page.evaluate(`
+        (function() {
+          const textarea = document.querySelector('textarea[id="image-video-prompt-box"]');
+          if (textarea) {
+            textarea.focus();
+            textarea.value = ${JSON.stringify(prompt)};
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        })()
+      `);
 
       // Enter negative prompt if supported and provided
       if (negativePrompt) {
@@ -174,7 +195,7 @@ export class ElevenLabsAutomation {
       console.error('[ElevenLabsAutomation] Clicking generate button...');
       const generateButton = page.locator(SELECTORS.IMAGE_GEN.GENERATE_BUTTON).first();
       await generateButton.waitFor({ state: 'visible', timeout: 5000 });
-      await generateButton.click();
+      await generateButton.click({ force: true });
 
       // Wait for generation to complete
       await this.waitForGeneration(page);
